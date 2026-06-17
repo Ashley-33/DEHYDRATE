@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>脱水</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<style>
+  :root{
+    --paper:#f6f6f3;      /* clean cool off-white (not cream) */
+    --surface:#ffffff;    /* cards */
+    --surface-2:#f0f0ec;  /* inputs */
+    --line:#e5e5df;       /* hairlines */
+    --text:#1a1a1d;       /* ink */
+    --muted:#6e6e72;      /* secondary */
+    --faint:#a3a3a2;      /* tertiary */
+    --accent:#0e7c6f;     /* single accent: a dry, distilled teal, used with restraint */
+    --accent-dim:#0b5f55;
+    --danger:#b1503a;
+    --radius:14px;
+    --serif:"Songti SC","Noto Serif SC",Georgia,"Times New Roman",serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);color:var(--text);font-family:var(--sans);
+    line-height:1.55;-webkit-font-smoothing:antialiased;
+    padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  }
+  .wrap{max-width:560px;margin:0 auto;padding:20px 18px 64px;}
+
+  /* header */
+  header{display:flex;align-items:baseline;justify-content:space-between;margin:6px 0 22px;}
+  .brand{display:flex;align-items:baseline;gap:10px;}
+  .brand h1{
+    font-family:var(--serif);font-weight:600;font-size:30px;letter-spacing:.14em;
+    margin:0;color:var(--text);
+  }
+  .brand .en{font-size:11px;letter-spacing:.32em;color:var(--faint);text-transform:uppercase;}
+  .gear{
+    background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;
+    padding:6px;line-height:1;border-radius:8px;
+  }
+  .gear:hover,.gear:focus-visible{color:var(--accent);outline:none;}
+
+  .tag{color:var(--muted);font-size:13px;margin:-14px 0 22px;letter-spacing:.02em;}
+
+  /* flip card */
+  .flip{ perspective:1800px; }
+  .flip-inner{
+    position:relative; transform-style:preserve-3d; -webkit-transform-style:preserve-3d;
+    transition:transform .6s cubic-bezier(.2,.7,.2,1), height .45s cubic-bezier(.2,.7,.2,1);
+  }
+  .flip-inner.flipped{ transform:rotateY(180deg); }
+  .face{
+    top:0; left:0; width:100%;
+    -webkit-backface-visibility:hidden; backface-visibility:hidden;
+  }
+  .face.front{ position:relative; }   /* defines fallback flow height */
+  .face.back{ position:absolute; transform:rotateY(180deg); }
+  .flip-inner:not(.flipped) .face.back{ pointer-events:none; }
+  .flip-inner.flipped .face.front{ pointer-events:none; }
+
+  .settings-title{
+    font-family:var(--serif);font-weight:600;font-size:24px;letter-spacing:.12em;
+    margin:0;color:var(--text);
+  }
+  .back-btn{ font-size:19px; }
+  .back .row{margin-bottom:14px;}
+  .back .row:last-of-type{margin-bottom:0;}
+  .done-btn{
+    width:100%;margin-top:20px;background:var(--accent);color:#fff;border:none;
+    border-radius:var(--radius);padding:13px;font-size:15px;font-weight:600;letter-spacing:.16em;
+    font-family:var(--serif);cursor:pointer;
+  }
+  .done-btn:hover{opacity:.92;}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;letter-spacing:.04em;}
+  select,input[type=text],input[type=password],textarea{
+    width:100%;background:var(--surface-2);border:1px solid var(--line);color:var(--text);
+    border-radius:10px;padding:11px 12px;font-size:15px;font-family:var(--sans);
+  }
+  select:focus,input:focus,textarea:focus{outline:none;border-color:var(--accent-dim);}
+  .hint{font-size:11.5px;color:var(--faint);margin-top:6px;line-height:1.5;}
+  .hint a{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--accent-dim);}
+
+  /* input zone */
+  .composer{
+    border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);
+    overflow:hidden;
+  }
+  textarea#src{
+    border:none;border-radius:0;min-height:128px;resize:vertical;background:transparent;
+    font-size:16px;padding:16px;display:block;
+  }
+  textarea#src::placeholder{color:var(--faint);}
+  .attach-bar{
+    display:flex;align-items:center;gap:10px;padding:10px 12px;border-top:1px solid var(--line);
+  }
+  .attach-btn{
+    display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);
+    border:1px solid var(--line);color:var(--muted);border-radius:9px;padding:8px 12px;
+    font-size:13px;cursor:pointer;
+  }
+  .attach-btn:hover{color:var(--text);border-color:var(--accent-dim);}
+  .attach-bar .spacer{flex:1;}
+  #attachInfo{font-size:12.5px;color:var(--accent);display:none;align-items:center;gap:8px;}
+  #attachInfo .x{cursor:pointer;color:var(--muted);}
+  #thumb{height:30px;width:30px;object-fit:cover;border-radius:6px;border:1px solid var(--line);display:none;}
+
+  .go{
+    width:100%;margin-top:16px;background:var(--accent);color:#fff;border:none;
+    border-radius:var(--radius);padding:15px;font-size:16px;font-weight:600;letter-spacing:.18em;
+    font-family:var(--serif);cursor:pointer;transition:opacity .15s;
+  }
+  .go:disabled{opacity:.4;cursor:default;}
+  .go:hover:not(:disabled){opacity:.92;}
+
+  /* output */
+  #out{margin-top:24px;}
+  .status{color:var(--muted);font-size:14px;text-align:center;padding:8px 0;}
+  .status.err{color:var(--danger);text-align:left;background:var(--surface);border:1px solid var(--line);
+    border-left:3px solid var(--danger);border-radius:10px;padding:13px 14px;}
+  .pulse{display:inline-block;animation:p 1.1s ease-in-out infinite;}
+  @keyframes p{0%,100%{opacity:.35}50%{opacity:1}}
+
+  .card{
+    border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);
+    padding:4px 0;animation:rise .35s ease;
+  }
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .layer{padding:18px 18px;border-bottom:1px solid var(--line);}
+  .layer:last-child{border-bottom:none;}
+  .eyebrow{font-size:10.5px;letter-spacing:.28em;text-transform:uppercase;color:var(--faint);margin-bottom:9px;}
+  .summary{font-family:var(--serif);font-size:21px;line-height:1.5;color:var(--text);}
+  .points{list-style:none;margin:0;padding:0;}
+  .points li{position:relative;padding-left:20px;margin:9px 0;font-size:15.5px;color:var(--text);}
+  .points li::before{content:"";position:absolute;left:2px;top:10px;width:6px;height:6px;
+    background:var(--accent-dim);border-radius:50%;}
+  .sowhat{font-size:16px;color:var(--text);}
+  .sowhat.none{color:var(--muted);font-style:italic;}
+  .layer.sowhat-layer{background:linear-gradient(180deg,rgba(14,124,111,.06),transparent);}
+  .layer.sowhat-layer .eyebrow{color:var(--accent);}
+
+  .reply-layer{background:var(--surface-2);}
+  .reply-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;}
+  .reply-head .eyebrow{margin-bottom:0;}
+  .copy-btn{
+    background:none;border:1px solid var(--line);color:var(--muted);
+    border-radius:8px;padding:4px 11px;font-size:12px;cursor:pointer;font-family:var(--sans);
+  }
+  .copy-btn:hover{color:var(--accent);border-color:var(--accent-dim);}
+  .reply-text{
+    font-size:15.5px;color:var(--text);white-space:pre-wrap;
+    border-left:2px solid var(--accent-dim);padding-left:12px;
+  }
+
+  .foot{text-align:center;color:var(--faint);font-size:11px;margin-top:28px;letter-spacing:.04em;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="flip" id="flip">
+    <div class="flip-inner" id="flipInner">
+
+      <!-- 正面：工具 -->
+      <section class="face front" id="frontFace">
+        <header>
+          <div class="brand">
+            <h1>脱水</h1><span class="en">dehydrate</span>
+          </div>
+          <button class="gear" id="gearBtn" aria-label="设置" title="设置">⚙</button>
+        </header>
+        <p class="tag">把注水的内容挤干，只留一句话、几个关键点，和「所以呢」。</p>
+
+        <div class="composer">
+          <textarea id="src" placeholder="粘贴一段话，或直接 Ctrl/⌘+V 贴一张图…"></textarea>
+          <div class="attach-bar">
+            <button class="attach-btn" id="fileBtn">＋ 文件 / 图片</button>
+            <input type="file" id="file" accept="image/*,.pdf,.docx,.txt,.md" hidden />
+            <div class="spacer"></div>
+            <img id="thumb" alt="" />
+            <span id="attachInfo"><span id="attachName"></span><span class="x" id="attachX">✕</span></span>
+          </div>
+        </div>
+
+        <button class="go" id="goBtn">脱 水</button>
+        <div id="out"></div>
+        <p class="foot">内容与 key 都不经过任何服务器 · 纯本地工具</p>
+      </section>
+
+      <!-- 背面：设置 -->
+      <section class="face back" id="backFace">
+        <header>
+          <h2 class="settings-title">设置</h2>
+          <button class="gear back-btn" id="backBtn" aria-label="返回" title="返回">↩</button>
+        </header>
+        <div class="row">
+          <label for="provider">用哪家模型</label>
+          <select id="provider">
+            <optgroup label="国产 · 国内直连，无需翻墙">
+              <option value="zhipu">智谱 GLM（免费多模态 · 能看图 · 推荐）</option>
+              <option value="qwen">通义千问 Qwen（支持看图）</option>
+              <option value="deepseek">DeepSeek 深度求索（仅文字）</option>
+              <option value="moonshot">Moonshot Kimi</option>
+            </optgroup>
+            <optgroup label="国外 · 可能需要网络代理">
+              <option value="gemini">Google Gemini（免费 key，不要卡）</option>
+              <option value="openrouter">OpenRouter（一个 key 通多家）</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="row">
+          <label for="apikey">你的 API key（只存在这台设备，永不上传）</label>
+          <input type="password" id="apikey" placeholder="贴在这里" autocomplete="off" />
+          <div class="hint" id="keyHint"></div>
+        </div>
+        <div class="row">
+          <label for="model">模型名（改了名照填，向后兼容）</label>
+          <input type="text" id="model" />
+        </div>
+        <div class="row">
+          <label for="persona">「可以这么回」的语气</label>
+          <select id="persona">
+            <option value="warm">亲切 · 像朋友</option>
+            <option value="savage">毒舌 · 犀利反讽</option>
+            <option value="eq">高情商 · 圆融得体</option>
+            <option value="proper">正经 · 专业中性</option>
+            <option value="lazy">摆烂 · 能短就短</option>
+          </select>
+        </div>
+        <div class="hint">建议用免费层 key 或设个消费上限，丢了也不心疼。</div>
+        <button class="done-btn" id="doneBtn">完成</button>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc =
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+const $ = id => document.getElementById(id);
+const els = {
+  gear:$("gearBtn"), provider:$("provider"),
+  key:$("apikey"), model:$("model"), keyHint:$("keyHint"), persona:$("persona"),
+  src:$("src"), file:$("file"), fileBtn:$("fileBtn"),
+  thumb:$("thumb"), attachInfo:$("attachInfo"), attachName:$("attachName"), attachX:$("attachX"),
+  go:$("goBtn"), out:$("out"),
+};
+
+// 每家一行配置。kind=gemini 走 Gemini 专用格式；其余都是 OpenAI 兼容 /chat/completions。
+// model 是默认值，设置里可改（厂商改名照填即可）。vision=false 的不支持看图。
+const PROVIDERS = {
+  zhipu:    { kind:"openai", base:"https://open.bigmodel.cn/api/paas/v4/chat/completions",
+              model:"glm-4v-flash", vision:true,
+              keyHint:'去 <a href="https://open.bigmodel.cn/usercenter/apikeys" target="_blank" rel="noopener">open.bigmodel.cn</a> 建 key，GLM-4V-Flash 免费、能看图。' },
+  qwen:     { kind:"openai", base:"https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+              model:"qwen-vl-plus", vision:true,
+              keyHint:'去阿里云百炼 <a href="https://bailian.console.aliyun.com/" target="_blank" rel="noopener">bailian.console.aliyun.com</a> 开通并建 key。' },
+  deepseek: { kind:"openai", base:"https://api.deepseek.com/chat/completions",
+              model:"deepseek-v4-flash", vision:false,
+              keyHint:'去 <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener">platform.deepseek.com</a> 建 key。注意：仅支持文字，不能看图。' },
+  moonshot: { kind:"openai", base:"https://api.moonshot.cn/v1/chat/completions",
+              model:"kimi-latest", vision:true,
+              keyHint:'去 <a href="https://platform.moonshot.cn/console/api-keys" target="_blank" rel="noopener">platform.moonshot.cn</a> 建 key。' },
+  gemini:   { kind:"gemini", base:"", model:"gemini-2.5-flash", vision:true,
+              keyHint:'去 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com</a> 免费领，不用信用卡（可能需网络代理）。' },
+  openrouter:{ kind:"openai", base:"https://openrouter.ai/api/v1/chat/completions",
+              model:"google/gemini-2.5-flash", vision:true,
+              keyHint:'去 <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai</a> 建 key，可路由到 DeepSeek、Qwen 等国产模型。' },
+};
+const DEFAULT_PROVIDER = "zhipu";
+
+// 回复的性格。只影响「你可以这么回」那一层，上面三层保持中立。
+const PERSONAS = {
+  warm:   { label:"亲切",   desc:"温暖、体贴、像朋友一样，多一点共情和善意" },
+  savage: { label:"毒舌",   desc:"犀利、机智、带点损和反讽，但点到为止、不真的伤人" },
+  eq:     { label:"高情商", desc:"圆融得体、照顾对方面子、把话说漂亮、留有余地" },
+  proper: { label:"正经",   desc:"专业、中性、简洁，像正式场合该有的得体回复" },
+  lazy:   { label:"摆烂",   desc:"懒散敷衍、能短就短、一副不太想多说的样子，但仍然切题" },
+};
+const DEFAULT_PERSONA = "warm";
+
+// ---- state ----
+let attachment = null; // { kind:'image'|'text', dataUrl?, mime?, base64?, text?, name }
+
+// ---- settings persistence (localStorage only) ----
+function loadSettings(){
+  let p = localStorage.getItem("ts_provider") || DEFAULT_PROVIDER;
+  if(!PROVIDERS[p]) p = DEFAULT_PROVIDER;
+  els.provider.value = p;
+  els.key.value = localStorage.getItem("ts_key_"+p) || "";
+  els.model.value = localStorage.getItem("ts_model_"+p) || PROVIDERS[p].model;
+  els.keyHint.innerHTML = PROVIDERS[p].keyHint;
+  els.persona.value = localStorage.getItem("ts_persona") || DEFAULT_PERSONA;
+}
+function saveSettings(){
+  const p = els.provider.value;
+  localStorage.setItem("ts_provider", p);
+  localStorage.setItem("ts_key_"+p, els.key.value.trim());
+  localStorage.setItem("ts_model_"+p, els.model.value.trim() || PROVIDERS[p].model);
+  localStorage.setItem("ts_persona", els.persona.value);
+}
+els.provider.addEventListener("change", ()=>{
+  const p = els.provider.value;
+  els.key.value = localStorage.getItem("ts_key_"+p) || "";
+  els.model.value = localStorage.getItem("ts_model_"+p) || PROVIDERS[p].model;
+  els.keyHint.innerHTML = PROVIDERS[p].keyHint;
+  saveSettings();
+});
+[els.key, els.model].forEach(el => el.addEventListener("input", saveSettings));
+els.persona.addEventListener("change", saveSettings);
+// ---- flip card (front=tool / back=settings) ----
+const flipInner = $("flipInner"), frontFace = $("frontFace"), backFace = $("backFace");
+let flipped = false;
+function syncHeight(){
+  const h = (flipped ? backFace : frontFace).offsetHeight;
+  if(h) flipInner.style.height = h + "px";
+}
+function flip(toBack){
+  flipped = toBack;
+  flipInner.classList.toggle("flipped", flipped);
+  saveSettings();
+  syncHeight();
+  setTimeout(syncHeight, 80); // re-measure after rotation/layout settles
+}
+els.gear.addEventListener("click", ()=> flip(true));
+$("backBtn").addEventListener("click", ()=> flip(false));
+$("doneBtn").addEventListener("click", ()=> flip(false));
+window.addEventListener("resize", syncHeight);
+// auto-track height when either face's content changes (output render, textarea drag, attachments)
+if(window.ResizeObserver){
+  new ResizeObserver(()=>{ if(!flipped) syncHeight(); }).observe(frontFace);
+  new ResizeObserver(()=>{ if(flipped) syncHeight(); }).observe(backFace);
+}
+
+// ---- attachments ----
+function setAttachment(a){
+  attachment = a;
+  if(!a){ clearAttachment(); return; }
+  els.attachInfo.style.display = "inline-flex";
+  els.attachName.textContent = a.name + (a.kind==="text" && a.text!=null ? `（${a.text.length} 字）` : "");
+  if(a.kind==="image"){ els.thumb.src = a.dataUrl; els.thumb.style.display="block"; }
+  else { els.thumb.style.display="none"; }
+}
+function clearAttachment(){
+  attachment = null;
+  els.attachInfo.style.display="none";
+  els.thumb.style.display="none";
+  els.thumb.src="";
+  els.file.value="";
+}
+els.attachX.addEventListener("click", clearAttachment);
+els.fileBtn.addEventListener("click", ()=> els.file.click());
+
+els.file.addEventListener("change", async e=>{
+  const f = e.target.files[0]; if(!f) return;
+  try { await ingestFile(f); }
+  catch(err){ showError("这个文件没读成：" + err.message + "。换个文件，或把内容复制成文字。"); clearAttachment(); }
+});
+
+// paste image straight into the textarea
+els.src.addEventListener("paste", async e=>{
+  const items = e.clipboardData && e.clipboardData.items;
+  if(!items) return;
+  for(const it of items){
+    if(it.type && it.type.startsWith("image/")){
+      e.preventDefault();
+      const blob = it.getAsFile();
+      const dataUrl = await blobToDataUrl(blob);
+      setAttachment({ kind:"image", dataUrl, mime:blob.type, base64:dataUrl.split(",")[1], name:"粘贴的图片" });
+      return;
+    }
+  }
+});
+
+async function ingestFile(f){
+  const name = f.name;
+  const lower = name.toLowerCase();
+  if(f.type.startsWith("image/")){
+    const dataUrl = await blobToDataUrl(f);
+    setAttachment({ kind:"image", dataUrl, mime:f.type, base64:dataUrl.split(",")[1], name });
+  } else if(lower.endsWith(".pdf")){
+    const text = await readPdf(f);
+    setAttachment({ kind:"text", text, name });
+  } else if(lower.endsWith(".docx")){
+    if(!window.mammoth) throw new Error("docx 解析库没加载");
+    const buf = await f.arrayBuffer();
+    const res = await mammoth.extractRawText({ arrayBuffer: buf });
+    setAttachment({ kind:"text", text:res.value, name });
+  } else if(lower.endsWith(".txt") || lower.endsWith(".md") || f.type.startsWith("text/")){
+    const text = await f.text();
+    setAttachment({ kind:"text", text, name });
+  } else {
+    throw new Error("暂不支持这种格式（支持 图片 / PDF / docx / txt）");
+  }
+}
+
+async function readPdf(f){
+  if(!window.pdfjsLib) throw new Error("PDF 解析库没加载");
+  const buf = await f.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  let out = "";
+  const max = Math.min(pdf.numPages, 30); // cap for sanity
+  for(let i=1;i<=max;i++){
+    const page = await pdf.getPage(i);
+    const tc = await page.getTextContent();
+    out += tc.items.map(t=>t.str).join(" ") + "\n";
+  }
+  return out.trim();
+}
+
+function blobToDataUrl(blob){
+  return new Promise((res,rej)=>{
+    const r = new FileReader();
+    r.onload = ()=>res(r.result);
+    r.onerror = ()=>rej(new Error("读取失败"));
+    r.readAsDataURL(blob);
+  });
+}
+
+// ---- the prompt ----
+function buildSystem(personaDesc){
+  return `你是「脱水」工具。把用户给的内容挤掉水分，只留干货。
+
+要命的前提：用户给的常常是从聊天记录、剪贴板里随手复制的「一坨」，里面可能夹着彼此毫无关系的东西——一段鸡汤、一条考勤打卡通知、一句签名、一段广告尾巴，全混在一起。
+
+所以动手前先判断：这是「一篇连贯的内容」，还是「几段拼在一起的无关内容」？
+· 如果是几段无关的 → 绝对不要硬编一个把它们串起来的主题。（反面教材：把一段管理观点和一条打卡通知焊成「揭示了伟大公司的根源，并通报了打卡进度」——这种就是废话，禁止。）这种情况下：summary 直接说清「这其实是几段不相关的内容」，points 里一段一句分开列；与主体无关的杂项（通知、签名、广告）单独标出或直接忽略，绝不混进主体。
+· 如果就是连贯的一篇 → 正常脱水。
+
+只输出 JSON：
+- summary：一句话讲清这到底是什么。不超过 40 字。别为了显得有内容而注水。
+- points：数组，关键点。条数按内容定，简单的 1~2 条、复杂的多给，不凑数也不硬砍，每条 ≤30 字。
+- soWhat：「所以呢」。铁律：这一层必须是 summary 和 points 里【没说过的新信息】——潜台词、藏着的待办、值不值得信、对方真实意图。把上面换个说法再说一遍 = 复读 = 废话（反面教材：上面讲了「组织能力造就伟大公司」，soWhat 又写「评判企业应聚焦组织能力」，这就是复读，禁止）。如果内容里藏着具体待办（deadline、要回复、要交东西、要打卡），把那件事拎出来，这才是真·所以呢。如果它就是个道理/观点、既没潜台词也没待办，就老实返回「没什么所以呢，就是个道理」，别硬升华。
+- reply：「你可以这么回」。仅当内容是别人发来、需要你回应时，才写一条可直接发出的回复，语气：${personaDesc}；只写正文不加解释。不需要回复就返回 ""。
+
+补充：如果内容本身已经很凝练（一句格言、一个定义），别硬换词复述充数，直接说它在讲什么、有没有实际的所以呢。
+规则：输出语言跟随输入；只依据给定内容，不脑补、不编造；看不懂或信息不足就如实说。`;
+}
+
+function buildUserText(typed){
+  let parts = [];
+  if(typed) parts.push(typed);
+  if(attachment && attachment.kind==="text" && attachment.text)
+    parts.push(`【文件：${attachment.name}】\n${attachment.text}`);
+  let t = parts.join("\n\n").trim();
+  if(attachment && attachment.kind==="image" && !t)
+    t = "请脱水这张图：它是什么、核心信息是什么。";
+  return t;
+}
+
+// ---- providers ----
+async function callGemini(key, model, userText, systemText){
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
+  const parts = [{ text: userText }];
+  if(attachment && attachment.kind==="image")
+    parts.push({ inline_data:{ mime_type:attachment.mime, data:attachment.base64 } });
+  const body = {
+    system_instruction:{ parts:[{ text:systemText }] },
+    contents:[{ role:"user", parts }],
+    generationConfig:{
+      responseMimeType:"application/json",
+      responseSchema:{
+        type:"OBJECT",
+        properties:{
+          summary:{type:"STRING"},
+          points:{type:"ARRAY", items:{type:"STRING"}},
+          soWhat:{type:"STRING"},
+          reply:{type:"STRING"}
+        },
+        required:["summary","points","soWhat","reply"]
+      }
+    }
+  };
+  const r = await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  if(!r.ok){ throw new Error(await readErr(r)); }
+  const data = await r.json();
+  const txt = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if(!txt) throw new Error("模型没返回内容（可能被安全过滤拦了，换个内容试试）");
+  return JSON.parse(txt);
+}
+
+async function callOpenAICompatible(base, key, model, userText, systemText){
+  const content = [{ type:"text", text:userText }];
+  if(attachment && attachment.kind==="image")
+    content.push({ type:"image_url", image_url:{ url:attachment.dataUrl } });
+  const body = {
+    model,
+    messages:[{ role:"system", content:systemText }, { role:"user", content }],
+    response_format:{ type:"json_object" }
+  };
+  const r = await fetch(base,{
+    method:"POST",
+    headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+key },
+    body:JSON.stringify(body)
+  });
+  if(!r.ok){ throw new Error(await readErr(r)); }
+  const data = await r.json();
+  const txt = data?.choices?.[0]?.message?.content;
+  if(!txt) throw new Error("模型没返回内容，换个内容或模型试试");
+  return JSON.parse(extractJson(txt));
+}
+
+// 有些模型不严格遵守 json 模式，会包一层文字/代码块，兜底抠出 JSON
+function extractJson(s){
+  s = s.trim().replace(/^```(?:json)?/i,"").replace(/```$/,"").trim();
+  const a = s.indexOf("{"), b = s.lastIndexOf("}");
+  return (a>=0 && b>a) ? s.slice(a, b+1) : s;
+}
+
+async function readErr(r){
+  let detail = "";
+  try { const j = await r.json(); detail = j?.error?.message || JSON.stringify(j); }
+  catch { detail = await r.text().catch(()=> ""); }
+  return `请求失败（${r.status}）：${detail || "无详情"}`;
+}
+
+// ---- render ----
+function showStatus(html, isErr){
+  els.out.innerHTML = `<div class="status${isErr?" err":""}">${html}</div>`;
+}
+function showError(msg){ showStatus(esc(msg), true); }
+
+function render(res){
+  const points = Array.isArray(res.points) ? res.points.filter(Boolean) : [];
+  const sw = (res.soWhat||"").trim();
+  const swNone = /^没什么所以呢|^没有|^无$/.test(sw);
+  const reply = (res.reply||"").trim();
+  const showReply = reply && !/^不需要回复|^无需回复|^（?无）?$/.test(reply);
+  const personaLabel = (PERSONAS[els.persona.value]||{}).label || "";
+  els.out.innerHTML = `
+    <div class="card">
+      <div class="layer">
+        <div class="eyebrow">一句话</div>
+        <div class="summary">${esc(res.summary||"—")}</div>
+      </div>
+      ${points.length ? `
+      <div class="layer">
+        <div class="eyebrow">关键点</div>
+        <ul class="points">${points.map(p=>`<li>${esc(p)}</li>`).join("")}</ul>
+      </div>` : ""}
+      <div class="layer sowhat-layer">
+        <div class="eyebrow">所以呢</div>
+        <div class="sowhat${swNone?" none":""}">${esc(sw||"—")}</div>
+      </div>
+      ${showReply ? `
+      <div class="layer reply-layer">
+        <div class="reply-head">
+          <div class="eyebrow">可以这么回${personaLabel?` · ${esc(personaLabel)}`:""}</div>
+          <button class="copy-btn" id="copyReply">复制</button>
+        </div>
+        <div class="reply-text" id="replyText">${esc(reply)}</div>
+      </div>` : ""}
+    </div>`;
+  if(showReply){
+    const btn = document.getElementById("copyReply");
+    btn.addEventListener("click", async ()=>{
+      try{ await navigator.clipboard.writeText(reply); btn.textContent="已复制"; }
+      catch{ btn.textContent="复制失败"; }
+      setTimeout(()=>{ btn.textContent="复制"; }, 1600);
+    });
+  }
+}
+
+function esc(s){ return String(s).replace(/[&<>"']/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+// ---- run ----
+async function run(){
+  saveSettings();
+  const provider = els.provider.value;
+  const cfg = PROVIDERS[provider];
+  const key = els.key.value.trim();
+  const model = (els.model.value.trim() || cfg.model);
+  const typed = els.src.value.trim();
+  const userText = buildUserText(typed);
+  const hasImage = attachment && attachment.kind==="image";
+  const persona = PERSONAS[els.persona.value] || PERSONAS[DEFAULT_PERSONA];
+  const systemText = buildSystem(persona.desc);
+
+  if(!key){
+    flip(true);
+    showError("还没填 API key。翻到背面（点 ⚙）贴上你的 key。");
+    return;
+  }
+  if(!userText && !hasImage){
+    showError("先给点东西脱水：粘贴文字、贴张图，或传个文件。");
+    return;
+  }
+  if(hasImage && !cfg.vision){
+    showError("这家模型不能看图。换成 智谱 GLM / 通义千问 / Gemini，或去掉图片只发文字。");
+    return;
+  }
+
+  els.go.disabled = true;
+  showStatus('<span class="pulse">正在挤水…</span>');
+  try{
+    const res = cfg.kind==="gemini"
+      ? await callGemini(key, model, userText, systemText)
+      : await callOpenAICompatible(cfg.base, key, model, userText, systemText);
+    render(res);
+  }catch(err){
+    let m = err.message || String(err);
+    if(err instanceof TypeError) // network/CORS-level failure
+      m = "连不上这家接口——很可能是浏览器跨域（CORS）被挡了，国产 API 多半不放浏览器直连。可以去 ⚙ 换一家试，或改用 OpenRouter。";
+    else if(/JSON/.test(m))
+      m = "模型返回的格式没对上，再点一次试试。";
+    showError(m);
+  }finally{
+    els.go.disabled = false;
+  }
+}
+els.go.addEventListener("click", run);
+// ⌘/Ctrl + Enter 提交
+els.src.addEventListener("keydown", e=>{
+  if((e.metaKey||e.ctrlKey) && e.key==="Enter"){ e.preventDefault(); run(); }
+});
+
+loadSettings();
+syncHeight();
+window.addEventListener("load", syncHeight);
+</script>
+</body>
+</html>

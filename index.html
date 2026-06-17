@@ -4,6 +4,14 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>脱水</title>
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="theme-color" content="#0e7c6f" />
+<link rel="icon" href="favicon-64.png" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="脱水" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <style>
@@ -157,6 +165,34 @@
   }
 
   .foot{text-align:center;color:var(--faint);font-size:11px;margin-top:28px;letter-spacing:.04em;}
+
+  /* 添加到主屏 引导条 */
+  .a2hs{
+    position:fixed;left:50%;transform:translateX(-50%);
+    bottom:calc(env(safe-area-inset-bottom) + 14px);
+    width:min(520px, calc(100% - 28px));
+    display:flex;align-items:center;gap:12px;
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:12px 12px 12px 14px;box-shadow:0 12px 34px rgba(0,0,0,.14);
+    z-index:50;animation:rise .35s ease;
+  }
+  .a2hs[hidden]{display:none;}
+  .a2hs-icon{width:42px;height:42px;border-radius:10px;flex:none;}
+  .a2hs-text{flex:1;min-width:0;}
+  .a2hs-title{font-family:var(--serif);font-size:15px;font-weight:600;letter-spacing:.08em;color:var(--text);}
+  .a2hs-sub{font-size:12px;color:var(--muted);margin-top:2px;line-height:1.45;}
+  .a2hs-sub b{color:var(--accent);font-weight:600;}
+  .a2hs-add{
+    flex:none;background:var(--accent);color:#fff;border:none;border-radius:10px;
+    padding:9px 16px;font-size:14px;font-weight:600;font-family:var(--serif);
+    letter-spacing:.1em;cursor:pointer;
+  }
+  .a2hs-add:hover{opacity:.92;}
+  .a2hs-close{
+    flex:none;background:none;border:none;color:var(--faint);font-size:15px;
+    cursor:pointer;padding:6px;line-height:1;align-self:flex-start;
+  }
+  .a2hs-close:hover{color:var(--muted);}
 </style>
 </head>
 <body>
@@ -236,6 +272,17 @@
 
     </div>
   </div>
+</div>
+
+<!-- 添加到主屏 引导条 -->
+<div class="a2hs" id="a2hs" hidden>
+  <img class="a2hs-icon" src="icon-192.png" alt="脱水" />
+  <div class="a2hs-text">
+    <div class="a2hs-title">把「脱水」加到主屏</div>
+    <div class="a2hs-sub" id="a2hsSub">像 App 一样，一点就开</div>
+  </div>
+  <button class="a2hs-add" id="a2hsAdd">添加</button>
+  <button class="a2hs-close" id="a2hsClose" aria-label="不用了">✕</button>
 </div>
 
 <script>
@@ -624,6 +671,50 @@ els.src.addEventListener("keydown", e=>{
 loadSettings();
 syncHeight();
 window.addEventListener("load", syncHeight);
+
+// ---- service worker（让脱水可安装、可离线开壳；file:// 下自动跳过）----
+if("serviceWorker" in navigator && location.protocol.startsWith("http")){
+  window.addEventListener("load", ()=> navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
+
+// ---- 添加到主屏 引导 ----
+(function(){
+  const banner=$("a2hs"), addBtn=$("a2hsAdd"), closeBtn=$("a2hsClose"), sub=$("a2hsSub");
+  const DISMISS="ts_a2hs_dismissed";
+  const standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone===true;
+  const isiOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+                (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1); // iPadOS 伪装成 Mac
+  let deferred=null;
+
+  const show = ()=>{ banner.hidden=false; };
+  const hide = ()=>{ banner.hidden=true; };
+  const dismiss = ()=>{ localStorage.setItem(DISMISS,"1"); hide(); };
+  closeBtn.addEventListener("click", dismiss);
+
+  if(standalone || localStorage.getItem(DISMISS)==="1") return; // 已安装或已忽略，不打扰
+
+  // Android / 桌面 Chromium：可程序化安装
+  window.addEventListener("beforeinstallprompt", e=>{
+    e.preventDefault(); deferred=e;
+    addBtn.style.display=""; sub.textContent="像 App 一样，一点就开";
+    show();
+  });
+  addBtn.addEventListener("click", async ()=>{
+    if(!deferred) return;
+    deferred.prompt();
+    const { outcome } = await deferred.userChoice;
+    deferred=null;
+    outcome==="accepted" ? hide() : dismiss();
+  });
+  window.addEventListener("appinstalled", dismiss);
+
+  // iOS Safari：装不了程序，给图文引导（没有 beforeinstallprompt）
+  if(isiOS){
+    addBtn.style.display="none";
+    sub.innerHTML='点底部 <b>分享</b> 按钮 ⎙ ，选「添加到主屏幕」';
+    setTimeout(show, 1200); // 缓一下再出现，别一进来就糊脸
+  }
+})();
 </script>
 </body>
 </html>

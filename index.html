@@ -146,6 +146,7 @@
   .points li{position:relative;padding-left:20px;margin:9px 0;font-size:15.5px;color:var(--text);}
   .points li::before{content:"";position:absolute;left:2px;top:10px;width:6px;height:6px;
     background:var(--accent-dim);border-radius:50%;}
+  .points-empty{font-size:15px;color:var(--muted);font-style:italic;line-height:1.5;}
   .sowhat{font-size:16px;color:var(--text);}
   .sowhat.none{color:var(--muted);font-style:italic;}
   .layer.sowhat-layer{background:linear-gradient(180deg,rgba(14,124,111,.06),transparent);}
@@ -208,7 +209,7 @@
           </div>
           <button class="gear" id="gearBtn" aria-label="设置" title="设置">⚙</button>
         </header>
-        <p class="tag">把注水的内容挤干，只留一句话、几个关键点，和「所以呢」。</p>
+        <p class="tag">把注水的内容挤干，只留一句话、几个关键点，和「所以呢」。<br/>需要回应时，再给你一句体面的回复。</p>
 
         <div class="composer">
           <textarea id="src" placeholder="粘贴一段话，或直接 Ctrl/⌘+V 贴一张图…"></textarea>
@@ -331,6 +332,21 @@ const PERSONAS = {
   lazy:   { label:"摆烂",   desc:"懒散敷衍、能短就短、一副不太想多说的样子，但仍然切题" },
 };
 const DEFAULT_PERSONA = "warm";
+
+// 「关键点」榨不出干货时，不留白，甩一句随机的丧职场冷幽默。
+const SLACKER_LINES = [
+  "没有关键点。就像这周的工作，看着满，其实空。",
+  "提炼不出重点——大概它本来就没有，跟周一例会一样。",
+  "关键点：无。摸鱼的含金量，正在被它重新定义。",
+  "这段话的营养，和食堂免费汤差不多。",
+  "没什么可划重点的，和你的 KPI 一样，查无此项。",
+  "重点为零。老板看了会沉默，你看了会解脱。",
+  "榨不出干货。它注的水，比你的工资条还实在。",
+  "没有要点。如果这是封邮件，它本可以是一条不发。",
+  "关键点缺货，补货时间未定，如同你的调休。",
+  "空。建议直接已读，把省下的脑子留给下班。",
+];
+function slackerLine(){ return SLACKER_LINES[Math.floor(Math.random()*SLACKER_LINES.length)]; }
 
 // ---- state ----
 let attachment = null; // { kind:'image'|'text', dataUrl?, mime?, base64?, text?, name }
@@ -586,11 +602,12 @@ function render(res){
         <div class="eyebrow">一句话</div>
         <div class="summary">${esc(res.summary||"—")}</div>
       </div>
-      ${points.length ? `
       <div class="layer">
         <div class="eyebrow">关键点</div>
-        <ul class="points">${points.map(p=>`<li>${esc(p)}</li>`).join("")}</ul>
-      </div>` : ""}
+        ${points.length
+          ? `<ul class="points">${points.map(p=>`<li>${esc(p)}</li>`).join("")}</ul>`
+          : `<div class="points-empty">${esc(slackerLine())}</div>`}
+      </div>
       <div class="layer sowhat-layer">
         <div class="eyebrow">所以呢</div>
         <div class="sowhat${swNone?" none":""}">${esc(sw||"—")}</div>

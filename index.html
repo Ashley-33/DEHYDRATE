@@ -116,6 +116,8 @@
     font-size:13px;cursor:pointer;
   }
   .attach-btn:hover{color:var(--text);border-color:var(--accent-dim);}
+  .attach-btn[hidden]{display:none;}
+  .clear-btn:hover{color:var(--danger);border-color:var(--danger);}
   .attach-bar .spacer{flex:1;}
   #attachInfo{font-size:12.5px;color:var(--accent);display:none;align-items:center;gap:8px;}
   #attachInfo .x{cursor:pointer;color:var(--muted);}
@@ -271,6 +273,7 @@
           <div class="attach-bar">
             <button class="attach-btn" id="fileBtn">＋ 文件 / 图片</button>
             <input type="file" id="file" accept="image/*,.pdf,.docx,.txt,.md" hidden />
+            <button class="attach-btn clear-btn" id="clearBtn" hidden>✕ 清空</button>
             <div class="spacer"></div>
             <img id="thumb" alt="" />
             <span id="attachInfo"><span id="attachName"></span><span class="x" id="attachX">✕</span></span>
@@ -377,7 +380,7 @@ const $ = id => document.getElementById(id);
 const els = {
   gear:$("gearBtn"), provider:$("provider"),
   key:$("apikey"), model:$("model"), keyHint:$("keyHint"), persona:$("persona"),
-  src:$("src"), file:$("file"), fileBtn:$("fileBtn"),
+  src:$("src"), file:$("file"), fileBtn:$("fileBtn"), clearBtn:$("clearBtn"),
   thumb:$("thumb"), attachInfo:$("attachInfo"), attachName:$("attachName"), attachX:$("attachX"),
   go:$("goBtn"), out:$("out"),
 };
@@ -503,6 +506,7 @@ function setAttachment(a){
   els.attachName.textContent = a.name + (a.kind==="text" && a.text!=null ? `（${a.text.length} 字）` : "");
   if(a.kind==="image"){ els.thumb.src = a.dataUrl; els.thumb.style.display="block"; }
   else { els.thumb.style.display="none"; }
+  updateClearBtn();
 }
 function clearAttachment(){
   attachment = null;
@@ -510,7 +514,21 @@ function clearAttachment(){
   els.thumb.style.display="none";
   els.thumb.src="";
   els.file.value="";
+  updateClearBtn();
 }
+// 有文字或有附件时，才显示「清空」
+function updateClearBtn(){
+  els.clearBtn.hidden = !(els.src.value.trim() || attachment);
+}
+// 一键清空：文字 + 附件，并把光标放回输入框
+function clearAll(){
+  els.src.value = "";
+  clearAttachment();
+  updateClearBtn();
+  els.src.focus();
+}
+els.clearBtn.addEventListener("click", clearAll);
+els.src.addEventListener("input", updateClearBtn);
 els.attachX.addEventListener("click", clearAttachment);
 els.fileBtn.addEventListener("click", ()=> els.file.click());
 

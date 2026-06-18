@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover" />
 <title>脱水</title>
 <link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#0e7c6f" />
@@ -31,12 +31,16 @@
     --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
+  html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
+  html,body{margin:0;padding:0;width:100%;overflow-x:hidden;}
   body{
     background:var(--paper);color:var(--text);font-family:var(--sans);
     line-height:1.55;-webkit-font-smoothing:antialiased;
     padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    touch-action:manipulation;        /* 关掉双击缩放 */
   }
+  /* 输入控件字号 ≥16px，避免 iOS 聚焦时自动放大页面 */
+  textarea,input,select{font-size:16px;}
   .wrap{max-width:560px;margin:0 auto;padding:20px 18px 64px;}
 
   /* header */
@@ -358,6 +362,14 @@
 
 <script>
 "use strict";
+// iOS Safari 无视 user-scalable=no，这里拦掉双指捏合手势缩放
+["gesturestart","gesturechange","gestureend"].forEach(ev =>
+  document.addEventListener(ev, e => e.preventDefault(), { passive:false }));
+// 兜底拦双指多点触控缩放
+document.addEventListener("touchmove", e => {
+  if (e.touches && e.touches.length > 1) e.preventDefault();
+}, { passive:false });
+
 if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc =
   "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 

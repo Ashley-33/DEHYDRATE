@@ -194,6 +194,52 @@
     cursor:pointer;padding:6px;line-height:1;align-self:flex-start;
   }
   .a2hs-close:hover{color:var(--muted);}
+
+  /* 首页提示：未绑定 AI（可点击跳设置）*/
+  .notice{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;
+    text-align:left;font-family:var(--sans);font-size:13.5px;cursor:pointer;
+    background:linear-gradient(180deg,rgba(14,124,111,.09),rgba(14,124,111,.03));
+    border:1px solid var(--accent-dim);border-radius:12px;
+    padding:12px 14px;margin:0 0 16px;color:var(--accent-dim);line-height:1.4;
+  }
+  .notice[hidden]{display:none;}
+  .notice .notice-cta{flex:none;font-weight:600;color:var(--accent);letter-spacing:.04em;}
+  .notice:hover{background:linear-gradient(180deg,rgba(14,124,111,.14),rgba(14,124,111,.05));}
+
+  /* 当前模型不能看图 提示 */
+  .vision-warn{font-size:12.5px;color:var(--danger);margin:12px 2px 0;line-height:1.5;}
+  .vision-warn[hidden]{display:none;}
+
+  /* 首次进入 介绍弹窗 */
+  .intro{
+    position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;
+    padding:24px;background:rgba(26,26,29,.42);
+    -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);
+  }
+  .intro[hidden]{display:none;}
+  .intro-card{
+    background:var(--surface);border:1px solid var(--line);border-radius:18px;
+    max-width:380px;width:100%;padding:24px 22px 18px;box-shadow:0 24px 60px rgba(0,0,0,.22);
+    animation:rise .35s ease;
+  }
+  .intro-brand{display:flex;align-items:center;gap:12px;margin-bottom:16px;}
+  .intro-icon{width:46px;height:46px;border-radius:11px;flex:none;}
+  .intro-title{font-family:var(--serif);font-size:24px;font-weight:600;letter-spacing:.14em;color:var(--text);line-height:1;}
+  .intro-en{font-size:10px;letter-spacing:.32em;color:var(--faint);text-transform:uppercase;margin-top:6px;}
+  .intro-body{font-size:15px;color:var(--text);line-height:1.62;margin:0 0 12px;}
+  .intro-body b{color:var(--accent-dim);font-weight:600;}
+  .intro-sub{font-size:12.5px;color:var(--muted);line-height:1.55;margin:0 0 20px;}
+  .intro-btn{
+    width:100%;background:var(--accent);color:#fff;border:none;border-radius:12px;
+    padding:13px;font-size:15px;font-weight:600;letter-spacing:.14em;font-family:var(--serif);cursor:pointer;
+  }
+  .intro-btn:hover{opacity:.92;}
+  .intro-skip{
+    width:100%;background:none;border:none;color:var(--faint);font-size:13px;
+    cursor:pointer;padding:12px 0 2px;font-family:var(--sans);
+  }
+  .intro-skip:hover{color:var(--muted);}
 </style>
 </head>
 <body>
@@ -211,6 +257,11 @@
         </header>
         <p class="tag">把注水的内容挤干，只留一句话、几个关键点，和「所以呢」。<br/>需要回应时，再给你一句体面的回复。</p>
 
+        <button class="notice" id="setupNotice" hidden>
+          <span>还没绑定 AI，先填一个自己的 key 才能用</span>
+          <span class="notice-cta">去设置 →</span>
+        </button>
+
         <div class="composer">
           <textarea id="src" placeholder="粘贴一段话，或直接 Ctrl/⌘+V 贴一张图…"></textarea>
           <div class="attach-bar">
@@ -221,6 +272,8 @@
             <span id="attachInfo"><span id="attachName"></span><span class="x" id="attachX">✕</span></span>
           </div>
         </div>
+
+        <div class="vision-warn" id="visionWarn" hidden>⚠ 当前绑定的模型不能看图，只收文字。想发图请去 ⚙ 换成 智谱 GLM / 通义千问 / Gemini。</div>
 
         <button class="go" id="goBtn">脱 水</button>
         <div id="out"></div>
@@ -272,6 +325,23 @@
       </section>
 
     </div>
+  </div>
+</div>
+
+<!-- 首次进入 介绍弹窗 -->
+<div class="intro" id="intro" hidden>
+  <div class="intro-card">
+    <div class="intro-brand">
+      <img class="intro-icon" src="icon-192.png" alt="脱水" />
+      <div>
+        <div class="intro-title">脱水</div>
+        <div class="intro-en">DEHYDRATE</div>
+      </div>
+    </div>
+    <p class="intro-body">把别人甩来的一长段、一张图、一个文件，挤成 <b>一句话</b> + <b>几个关键点</b> + <b>「所以呢」</b>；需要回应时，再给你一句能直接发出去的回复。</p>
+    <p class="intro-sub">纯本地工具：用你自己的 AI key，内容和 key 都只待在这台设备，不上传任何服务器。第一步先去设置里绑定一个模型。</p>
+    <button class="intro-btn" id="introBtn">先去绑定 AI</button>
+    <button class="intro-skip" id="introSkip">已经懂了，直接用</button>
   </div>
 </div>
 
@@ -360,6 +430,7 @@ function loadSettings(){
   els.model.value = localStorage.getItem("ts_model_"+p) || PROVIDERS[p].model;
   els.keyHint.innerHTML = PROVIDERS[p].keyHint;
   els.persona.value = localStorage.getItem("ts_persona") || DEFAULT_PERSONA;
+  refreshHints();
 }
 function saveSettings(){
   const p = els.provider.value;
@@ -377,6 +448,17 @@ els.provider.addEventListener("change", ()=>{
 });
 [els.key, els.model].forEach(el => el.addEventListener("input", saveSettings));
 els.persona.addEventListener("change", saveSettings);
+
+// ---- 首页提示：未绑定 AI / 当前模型不能看图 ----
+const setupNotice = $("setupNotice"), visionWarn = $("visionWarn");
+function currentProviderKey(){ return (localStorage.getItem("ts_key_"+els.provider.value)||"").trim(); }
+function refreshHints(){
+  setupNotice.hidden = !!currentProviderKey();          // 有 key 就不提醒
+  visionWarn.hidden  = !!PROVIDERS[els.provider.value].vision; // 不能看图才提醒
+}
+setupNotice.addEventListener("click", ()=> flip(true)); // 点提示 → 翻到设置
+els.provider.addEventListener("change", refreshHints);
+els.key.addEventListener("input", refreshHints);
 // ---- flip card (front=tool / back=settings) ----
 const flipInner = $("flipInner"), frontFace = $("frontFace"), backFace = $("backFace");
 let flipped = false;
@@ -688,6 +770,21 @@ els.src.addEventListener("keydown", e=>{
 loadSettings();
 syncHeight();
 window.addEventListener("load", syncHeight);
+
+// ---- 首次进入：介绍这是什么 ----
+(function(){
+  const intro=$("intro"), btn=$("introBtn"), skip=$("introSkip");
+  if(localStorage.getItem("ts_intro_seen")==="1") return;
+  intro.hidden=false;
+  const close=()=>{ localStorage.setItem("ts_intro_seen","1"); intro.hidden=true; };
+  if(currentProviderKey()){                 // 已绑过 key：直接开始
+    btn.textContent="开始用";
+    btn.addEventListener("click", close);
+  }else{                                     // 没绑：引导去设置
+    btn.addEventListener("click", ()=>{ close(); flip(true); });
+  }
+  skip.addEventListener("click", close);
+})();
 
 // ---- service worker（让脱水可安装、可离线开壳；file:// 下自动跳过）----
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
